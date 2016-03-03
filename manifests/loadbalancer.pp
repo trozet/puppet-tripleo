@@ -256,6 +256,10 @@
 #  (optional) Enable or not MidoNet API binding
 #  Defaults to false
 #
+# [*opendaylight*]
+#  (optional) Enable or not OpenDaylight binding
+#  Defaults to false
+#
 class tripleo::loadbalancer (
   $controller_virtual_ip,
   $control_virtual_interface,
@@ -310,6 +314,7 @@ class tripleo::loadbalancer (
   $rabbitmq                  = false,
   $redis                     = false,
   $midonet_api               = false,
+  $opendaylight              = false,
 ) {
 
   if !$controller_host and !$controller_hosts {
@@ -1095,6 +1100,29 @@ class tripleo::loadbalancer (
       listening_service => 'midonet_api',
       ports             => '8081',
       ipaddresses       => hiera('midonet_api_node_ips', $controller_hosts_real),
+      server_names      => $controller_hosts_names_real,
+      options           => $haproxy_member_options,
+    }
+  }
+
+  $opendaylight_api_vip = hiera('opendaylight_api_vip', $controller_virtual_ip)
+  $opendaylight_bind_opts = {
+    "${opendaylight_api_vip}:8081" => $haproxy_listen_bind_param,
+    "${public_virtual_ip}:8081" => $haproxy_listen_bind_param,
+  }
+
+  if $opendaylight {
+    haproxy::listen { 'opendaylight':
+      bind             => $opendaylight_bind_opts,
+      options          => {
+        'balance'   => 'source',
+      },
+      collect_exported => false,
+    }
+    haproxy::balancermember { 'opendaylight':
+      listening_service => 'opendaylight',
+      ports             => '8081',
+      ipaddresses       => hiera('opendaylight_api_node_ips', $controller_hosts_real),
       server_names      => $controller_hosts_names_real,
       options           => $haproxy_member_options,
     }
